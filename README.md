@@ -6,7 +6,7 @@ This API class wraps Faulhaber motor driver communication into functions that di
 
 There are 2 ways of invoking robot motion:
 
-1. User Interface - The robot is remotly controlled from the user's computer keyboard over TCP.  
+1. User Interface - In this mode the robot is remotely controlled from the user's computer keyboard over TCP.  
   Control keys:  
   *x* - increment speed on both motors.  
   *z* - decrement speed on both motors.  
@@ -14,7 +14,7 @@ There are 2 ways of invoking robot motion:
   *right arrow* - increment speed on the left motor, decrement speed on the right motor (turn right).  
   **Note** that the speeds are capped, once the speed limit is reached further increments are ignored.
   
-2. Encoder based motion - Uses encoder to travel a set amount of steps/millimeters or roatate a set amount of steps/degrees when corresponding API function is called.
+2. Encoder based motion - Robot moves autonomously when appropriate API function is called. Uses encoder to travel a set amount of steps/millimeters or rotate a set amount of steps/degrees.
 
 [FaulhaberComm.py](https://github.com/Slavon145/robot_control/blob/master/FaulhaberComm.py) - Contains the API class to communicate with Faulhaber motor drivers.  
 [robot_server.py](https://github.com/Slavon145/robot_control/blob/master/robot_server.py) - A socket server for the remote robot control. Runs on the robot.  
