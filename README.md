@@ -4,7 +4,7 @@ This API class wraps Faulhaber motor driver communication into functions that di
 
 ## Project Structure
 
-There are 2 ways of invoking robot motion:
+There are 2 ways of invoking robot motion through the given set of scripts:
 
 1. User Interface - In this mode the robot is remotely controlled from the user's computer keyboard over TCP.  
   Control keys:  
@@ -24,7 +24,8 @@ There are 2 ways of invoking robot motion:
 
 
 ## Dependencies
-* [pyserial](https://pyserial.readthedocs.io/en/latest/)
+* [pyserial](https://pyserial.readthedocs.io/en/latest/) - Provides serial communication with Faulhaber motor drivers.  
+* [keyboard](https://pypi.org/project/keyboard/) - Used to controll the robot from user's keyboard.  
 
 ## Deployment
 Built on a A Raspberry Pi 4. 
