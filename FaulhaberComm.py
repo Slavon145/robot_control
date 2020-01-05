@@ -9,6 +9,7 @@
 # If we meet some day, and you think this code is worth it, you can buy me a beer in return.
 
 import time
+from math import sin, cos
 import serial
 
 TRAVEL_SPEED = 2000
@@ -74,7 +75,7 @@ class FaulhaberComm:
     def write_sync(self, string):
         # Disable "OK" responces
         self._serialport.write("ANSW0\r".encode())
-        
+  
         # Send command
         self._serialport.write(string.encode())
 
@@ -98,22 +99,37 @@ class FaulhaberComm:
     def travel_forward(self, distance):
         self._travel_steps(self._VSCALE_R*self._STEPS_PER_MM*distance, self._VSCALE_L*self._STEPS_PER_MM*distance)
 
+        # Update pose.
+        self.pose["translation_x"] += distance*cos(distance)
+        self.pose["translation_y"] += distance*sin(distance)
 
     # @travel moves the robot in a straight line for the certain distance in millimeters.
     def travel_backward(self, distance):
         self._travel_steps(-self._VSCALE_R*self._STEPS_PER_MM*distance, -self._VSCALE_L*self._STEPS_PER_MM*distance)
 
+        # Update pose.
+        self.pose["translation_x"] -= distance*cos(distance)
+        self.pose["translation_y"] -= distance*sin(distance)
 
     # @turn_left - Turns left for the set amount of degrees.
     # Requires proper calibration of self._STEPS_PER_DEG
     def turn_left(self, degrees):
         self._travel_steps(self._VSCALE_R*self._STEPS_PER_DEG*degrees, -self._VSCALE_L*self._STEPS_PER_DEG*degrees)
-
+        
+        # Update pose.
+        self.pose["roatation"] -= degrees
+        if self.pose["roatation"] <= -180:
+            self.pose["roatation"] += 360
 
     # @turn_left - Turns left for the set amount of degrees.
     # Requires proper calibration of self._STEPS_PER_DEG
     def turn_right(self, degrees):
         self._travel_steps(-self._VSCALE_R*self._STEPS_PER_DEG*degrees, self._VSCALE_L*self._STEPS_PER_DEG*degrees)
+
+        # Update pose.
+        self.pose["roatation"] += degrees
+        if self.pose["roatation"] > 180:
+            self.pose["roatation"] -= 360
 
 
     # @_travel_steps - A helper function that makes motoer travel a certain amount of steps
@@ -171,6 +187,10 @@ class FaulhaberComm:
         self._serialport.close()
 
 
+    pose = {"roatation"  : 0,
+            "translation_x": 0,
+            "translation_y": 0,
+           }
     # Velocity scaling factors can be either 1 or -1.
     _VSCALE_L = -1
     _VSCALE_R = 1
@@ -182,4 +202,7 @@ class FaulhaberComm:
     # Encoder steps per degree and millimeter.
     #_STEPS_PER_DEG = 1500
     _STEPS_PER_DEG = 1505
+    # Wheel Circumference = 
+    # Steps per roatation = 3000
+    # Gear ratio = 1:66
     _STEPS_PER_MM = 667
