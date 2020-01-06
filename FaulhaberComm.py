@@ -212,12 +212,12 @@ class FaulhaberComm:
     ## read_position_right method
     # @brief Reads right motor's encoder, converts to mm
     def read_position_right(self):
-        return int(self.write_and_return("{node}POS".format(node=self._ADDR_R)))/self._STEPS_PER_MM
+        return self.write_and_return("{node}POS".format(node=self._ADDR_R))/self._STEPS_PER_MM
     
     ## read_position_left method
     # @brief Reads left motor's encoder, converts to mm
     def read_position_left(self):
-        return int(self.write_and_return("{node}POS".format(node=self._ADDR_L)))/self._STEPS_PER_MM
+        return self.write_and_return("{node}POS".format(node=self._ADDR_L))/self._STEPS_PER_MM
 
     ## diffdrive method
     # @brief Updates pose based on velocity integration aka differential drive
