@@ -57,10 +57,12 @@ class FaulhaberComm:
         self.write_and_confirm("{node}EN\r".format(node=self._ADDR_L))
         self.write_and_confirm("{node}EN\r".format(node=self._ADDR_R))
 
+
         # Start pose estimation thread if enabled.
         if positioning:
-            positioning_thread = threading.Thread(target=self.update_pose, daemon=True)
-            positioning_thread.start()
+            self._mutex = threading.Lock()
+            self.positioning_thread = threading.Thread(target=self.update_pose, daemon=True)
+            self.positioning_thread.start()
 
     ## write_and_return method
     # @brief writes a string over serial and returns the answer.
@@ -243,15 +245,18 @@ class FaulhaberComm:
             self.pose["roatation"] = self.pose["roatation"] + delta_theta
     
     def update_pose(self):
+
+        self._mutex.acquire()
         encoder_left = self.read_position_left()
         encoder_right = self.read_position_right()
+        self._mutex.release()
 
         t = time.time()
         velocity_left = (encoder_left - self.prev_encoder["left"])/t
         velocity_right = (encoder_right - self.prev_encoder["right"])/t
 
         self.prev_encoder["left"] += encoder_left
-        self.prev_encoder["right"] +=encoder_right
+        self.prev_encoder["right"] += encoder_right
 
         self.diffdrive(velocity_left, velocity_right, t, 245)
 
