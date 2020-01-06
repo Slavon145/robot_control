@@ -69,9 +69,13 @@ class FaulhaberComm:
     # @param string String to be written.
     # @return Answer string.
     def write_and_return(self, string):
+
+        self._mutex.acquire()
+
         self._serialport.reset_input_buffer()
         self._serialport.write(string.encode())
         response = self._serialport.read_until()
+        self._mutex.release()
 
         return response
     
@@ -91,6 +95,9 @@ class FaulhaberComm:
     #        to prevent serial from crashing.
     # @param string String to be written.
     def write_sync(self, string):
+
+        self._mutex.acquire()
+
         # Disable "OK" responces
         self._serialport.write("ANSW0\r".encode())
   
@@ -101,6 +108,7 @@ class FaulhaberComm:
         self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_R))
         self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_L))
 
+        self._mutex.release()
 
     ## set_velocity_right method.
     # @brief Sets continuous motor velocity. Robot keeps moving until velocity is updated.
@@ -183,6 +191,7 @@ class FaulhaberComm:
         self._enable_confirmations()
 
     def _enable_confirmations(self):
+
         self._serialport.write("ANSW2\r".encode())
         time.sleep(0.1)
         # There is potentially trash in the buffer.
@@ -246,10 +255,8 @@ class FaulhaberComm:
     
     def update_pose(self):
 
-        self._mutex.acquire()
         encoder_left = self.read_position_left()
         encoder_right = self.read_position_right()
-        self._mutex.release()
 
         t = time.time()
         velocity_left = (encoder_left - self.prev_encoder["left"])/t
