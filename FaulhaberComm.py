@@ -9,6 +9,7 @@
 # If we meet some day, and you think this code is worth it, you can buy me a beer in return.
 
 import time
+import threading
 from math import sin, cos
 import serial
 
@@ -17,8 +18,8 @@ MAX_ACCEL = 100
 
 class FaulhaberComm:
 
-    # Constructor
-    def __init__(self, com_port='/dev/ttyS0'):
+    ## Constructor
+    def __init__(self, com_port='/dev/ttyS0', positioning=True):
 
         # Open serial port
         self._serialport = serial.Serial(
@@ -56,22 +57,37 @@ class FaulhaberComm:
         self.write_and_confirm("{node}EN\r".format(node=self._ADDR_L))
         self.write_and_confirm("{node}EN\r".format(node=self._ADDR_R))
 
+        # Start pose estimation thread if enabled.
+        if positioning:
+            positioning_thread = threading.Thread(target=self.update_pose, daemon=True)
+            positioning_thread.start()
 
-    # @write_and_confirm sends a command and confirms the "OK" responce.
-    # Accessing each motor individually.
-    def write_and_confirm(self, string):
+    ## write_and_return method
+    # @brief writes a string over serial and returns the answer.
+    # @param string String to be written.
+    # @return Answer string.
+    def write_and_return(self, string):
         self._serialport.reset_input_buffer()
         self._serialport.write(string.encode())
-        responce = self._serialport.read_until()
+        response = self._serialport.read_until()
+
+        return response
+    
+    ## write_and_confirm method
+    # @brief Sends a command and confirms the "OK" responce. Accessing each motor individually.
+    # @param string String to be written.
+    def write_and_confirm(self, string):
+        response = self.write_and_return(string)
 
         # Check if responce is "OK"
-        if responce != b"OK\r\n":
+        if response != b"OK\r\n":
             raise Exception("Failed to confirm command.")
 
-
-    # @write_sync sends a command to both motors simmultaneously
-    # by temprorarily disabling asynchronous responses
-    # to prevent serial from crashing
+    ## write_sync method.
+    # @brief Sends a command to both motors simmultaneously
+    #        by temprorarily disabling asynchronous responses
+    #        to prevent serial from crashing.
+    # @param string String to be written.
     def write_sync(self, string):
         # Disable "OK" responces
         self._serialport.write("ANSW0\r".encode())
@@ -84,10 +100,9 @@ class FaulhaberComm:
         self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_L))
 
 
-    # @set_velocity_right
-    # @set_velocity_left
-    # Sets continuous motor velocity.
-    # Robot keeps moving until velocity is updated
+    ## set_velocity_right method.
+    # @brief Sets continuous motor velocity. Robot keeps moving until velocity is updated.
+    # @param velocity Velocity in steps/s
     def set_velocity_right(self, velocity):
         self.write_and_confirm("{node}V{v}\r".format(node=self._ADDR_L, v=self._VSCALE_L*velocity))
 
@@ -95,7 +110,9 @@ class FaulhaberComm:
         self.write_and_confirm("{node}V{v}\r".format(node=self._ADDR_R, v=self._VSCALE_R*velocity))
 
 
-    # @travel moves the robot in a straight line for the certain distance in millimeters.
+    ## travel_forward method.
+    # @brief Moves the robot in a straight line for the certain distance in millimeters.
+    # @param distance Distance to move in mm.
     def travel_forward(self, distance):
         self._travel_steps(self._VSCALE_R*self._STEPS_PER_MM*distance, self._VSCALE_L*self._STEPS_PER_MM*distance)
 
@@ -103,7 +120,9 @@ class FaulhaberComm:
         self.pose["translation_x"] += distance*cos(distance)
         self.pose["translation_y"] += distance*sin(distance)
 
-    # @travel moves the robot in a straight line for the certain distance in millimeters.
+    ## travel_backward method.
+    # @brief Moves the robot in a straight line for the certain distance in millimeters.
+    # @param distance Distance to move in mm.
     def travel_backward(self, distance):
         self._travel_steps(-self._VSCALE_R*self._STEPS_PER_MM*distance, -self._VSCALE_L*self._STEPS_PER_MM*distance)
 
@@ -111,29 +130,30 @@ class FaulhaberComm:
         self.pose["translation_x"] -= distance*cos(distance)
         self.pose["translation_y"] -= distance*sin(distance)
 
-    # @turn_left - Turns left for the set amount of degrees.
-    # Requires proper calibration of self._STEPS_PER_DEG
+    ## turn_left method.
+    # @brief Turns left for the set amount of degrees. Requires proper calibration of self._STEPS_PER_DEG
+    # @param degrees Amound of degrees to turn.
     def turn_left(self, degrees):
         self._travel_steps(self._VSCALE_R*self._STEPS_PER_DEG*degrees, -self._VSCALE_L*self._STEPS_PER_DEG*degrees)
-        
+        '''
         # Update pose.
         self.pose["roatation"] -= degrees
         if self.pose["roatation"] <= -180:
             self.pose["roatation"] += 360
+        '''
 
-    # @turn_left - Turns left for the set amount of degrees.
-    # Requires proper calibration of self._STEPS_PER_DEG
     def turn_right(self, degrees):
         self._travel_steps(-self._VSCALE_R*self._STEPS_PER_DEG*degrees, self._VSCALE_L*self._STEPS_PER_DEG*degrees)
-
+        '''
         # Update pose.
         self.pose["roatation"] += degrees
         if self.pose["roatation"] > 180:
             self.pose["roatation"] -= 360
+        '''
 
-
-    # @_travel_steps - A helper function that makes motoer travel a certain amount of steps
-    # TODO: at long distances encoder overflow occurs, robot stops on overflow
+    ## _travel_steps private method
+    # @brief A helper function that makes motoer travel a certain amount of steps
+    # @TODO: at long distances encoder overflow occurs, robot stops on overflow
     def _travel_steps(self, right_steps, left_steps):
 
         # Reset Absolute position to prevent overflow
@@ -158,8 +178,7 @@ class FaulhaberComm:
         while b'p' not in responce:
             responce = self._serialport.read_until()
 
-        self._enable_confirmations() 
-
+        self._enable_confirmations()
 
     def _enable_confirmations(self):
         self._serialport.write("ANSW2\r".encode())
@@ -175,22 +194,85 @@ class FaulhaberComm:
         self._serialport.reset_input_buffer()
 
 
-    # @stop stops motion. 
+    ## stop method
+    # @brief stops motion.
     def stop(self):
         self.write_sync("V0\r")
 
+    ## read_position_right method
+    # @brief Reads right motor's encoder, converts to mm
+    def read_position_right(self):
+        return int(self.write_and_return("{node}POS".format(node=self._ADDR_R)))/self._STEPS_PER_MM
+    
+    ## read_position_left method
+    # @brief Reads left motor's encoder, converts to mm
+    def read_position_left(self):
+        return int(self.write_and_return("{node}POS".format(node=self._ADDR_L)))/self._STEPS_PER_MM
 
-    # Destructor
+    ## diffdrive method
+    # @brief Updates pose based on velocity integration aka differential drive
+    # @param v_l Left speed.
+    # @param v_r Right speed.
+    # @param t Time for integration.
+    # @param l Distance between the wheels.
+    def diffdrive(self, v_l, v_r, t, l):
+
+        # Straight line, we need to avoid division by zero.
+        if v_l == v_r:
+            self.pose["translation_x"] = self.pose["translation_x"] + v_l * t * cos(self.pose["roatation"]) 
+            self.pose["translation_y"] = self.pose["translation_y"] + v_l * t * sin(self.pose["roatation"])
+
+        # Roatation.
+        else:
+            R = l/2.0 * ((v_l + v_r) / (v_r - v_l))
+
+            # Instanteneous Center of Roatation.
+            ICC_x = self.pose["translation_x"] - R * sin(self.pose["roatation"])
+            ICC_y = self.pose["translation_y"] + R * cos(self.pose["roatation"])
+
+            # Compute angular velocity. 
+            omega = (v_r - v_l) / l
+            
+            # computing angle change
+            delta_theta = omega * t
+
+            # forward kinematics for differential drive 
+            self.pose["translation_x"] = cos(delta_theta)*(self.pose["translation_x"] - ICC_x) - sin(delta_theta)*(self.pose["translation_y"] - ICC_y) + ICC_x
+            self.pose["translation_y"] = sin(delta_theta)*(self.pose["translation_x"] - ICC_x) + cos(delta_theta)*(self.pose["translation_y"] - ICC_y) + ICC_y
+
+            self.pose["roatation"] = self.pose["roatation"] + delta_theta
+    
+    def update_pose(self):
+        encoder_left = self.read_position_left()
+        encoder_right = self.read_position_right()
+
+        t = time.time()
+        velocity_left = (encoder_left - self.prev_encoder["left"])/t
+        velocity_right = (encoder_right - self.prev_encoder["right"])/t
+
+        self.prev_encoder["left"] += encoder_left
+        self.prev_encoder["right"] +=encoder_right
+
+        self.diffdrive(velocity_left, velocity_right, t, 245)
+
+        print(self.pose, end="\r")
+
+        time.sleep(0.5)
+
+    ## Destructor
     def __del__(self):
         self._serialport.write("V0\r".encode())
         self._enable_confirmations()
         self._serialport.close()
 
-
     pose = {"roatation"  : 0,
             "translation_x": 0,
             "translation_y": 0,
-           }
+            }
+    prev_encoder = {"left" : 0,
+                    "right" : 0
+                    }
+    _time = 0
     # Velocity scaling factors can be either 1 or -1.
     _VSCALE_L = -1
     _VSCALE_R = 1
@@ -202,6 +284,7 @@ class FaulhaberComm:
     # Encoder steps per degree and millimeter.
     #_STEPS_PER_DEG = 1500
     _STEPS_PER_DEG = 1505
+
     # Wheel Circumference = 
     # Steps per roatation = 3000
     # Gear ratio = 1:66

