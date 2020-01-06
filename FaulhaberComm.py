@@ -60,7 +60,6 @@ class FaulhaberComm:
 
         # Start pose estimation thread if enabled.
         if positioning:
-            self._mutex = threading.Lock()
             self.positioning_thread = threading.Thread(target=self.update_pose, daemon=True)
             self.positioning_thread.start()
 
@@ -277,6 +276,7 @@ class FaulhaberComm:
         self._enable_confirmations()
         self._serialport.close()
 
+    _mutex = threading.Lock()
     pose = {"roatation"  : 0,
             "translation_x": 0,
             "translation_y": 0,
