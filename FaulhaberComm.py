@@ -69,12 +69,10 @@ class FaulhaberComm:
     # @return Answer string.
     def write_and_return(self, string):
 
-        self._mutex.acquire()
-
-        self._serialport.reset_input_buffer()
-        self._serialport.write(string.encode())
-        response = self._serialport.read_until()
-        self._mutex.release()
+        with self._mutex:
+            self._serialport.reset_input_buffer()
+            self._serialport.write(string.encode())
+            response = self._serialport.read_until()
 
         return response
     
@@ -95,19 +93,17 @@ class FaulhaberComm:
     # @param string String to be written.
     def write_sync(self, string):
 
-        self._mutex.acquire()
+        with self._mutex:
 
-        # Disable "OK" responces
-        self._serialport.write("ANSW0\r".encode())
-  
-        # Send command
-        self._serialport.write(string.encode())
+            # Disable "OK" responces
+            self._serialport.write("ANSW0\r".encode())
+    
+            # Send command
+            self._serialport.write(string.encode())
 
-        # Re-enable responces
-        self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_R))
-        self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_L))
-
-        self._mutex.release()
+            # Re-enable responces
+            self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_R))
+            self.write_and_confirm("{node}ANSW2\r".format(node=self._ADDR_L))
 
     ## set_velocity_right method.
     # @brief Sets continuous motor velocity. Robot keeps moving until velocity is updated.
@@ -175,19 +171,20 @@ class FaulhaberComm:
         # Notify when done on right motor.
         self.write_and_confirm("{node}NP\r".format(node=self._ADDR_R))
         
-        # Disable confirmations from the left motor.
-        self._serialport.write("{node}ANSW0\r".format(node=self._ADDR_L).encode())
+        with self._mutex:
+            # Disable confirmations from the left motor.
+            self._serialport.write("{node}ANSW0\r".format(node=self._ADDR_L).encode())
 
-        # Start motion synchronously
-        # Beware Right motor should still send "OK"
-        self._serialport.write("M\r".encode())
+            # Start motion synchronously
+            # Beware Right motor should still send "OK"
+            self._serialport.write("M\r".encode())
 
-        # Wait until motion is finished
-        responce = b''
-        while b'p' not in responce:
-            responce = self._serialport.read_until()
+            # Wait until motion is finished
+            responce = b''
+            while b'p' not in responce:
+                responce = self._serialport.read_until()
 
-        self._enable_confirmations()
+            self._enable_confirmations()
 
     def _enable_confirmations(self):
 
@@ -212,12 +209,12 @@ class FaulhaberComm:
     ## read_position_right method
     # @brief Reads right motor's encoder, converts to mm
     def read_position_right(self):
-        return self.write_and_return("{node}POS".format(node=self._ADDR_R))/self._STEPS_PER_MM
+        return int(self.write_and_return("{node}POS\r".format(node=self._ADDR_R)))/self._STEPS_PER_MM
     
     ## read_position_left method
     # @brief Reads left motor's encoder, converts to mm
     def read_position_left(self):
-        return self.write_and_return("{node}POS".format(node=self._ADDR_L))/self._STEPS_PER_MM
+        return int(self.write_and_return("{node}POS\r".format(node=self._ADDR_L)))/self._STEPS_PER_MM
 
     ## diffdrive method
     # @brief Updates pose based on velocity integration aka differential drive
@@ -253,22 +250,24 @@ class FaulhaberComm:
             self.pose["roatation"] = self.pose["roatation"] + delta_theta
     
     def update_pose(self):
+        
+        while True:
+            encoder_left = self.read_position_left()
+            encoder_right = self.read_position_right()
 
-        encoder_left = self.read_position_left()
-        encoder_right = self.read_position_right()
+            t = time.time() - self._time
+            self._time = t
 
-        t = time.time()
-        velocity_left = (encoder_left - self.prev_encoder["left"])/t
-        velocity_right = (encoder_right - self.prev_encoder["right"])/t
+            velocity_left = (encoder_left - self.prev_encoder["left"])/t
+            velocity_right = (encoder_right - self.prev_encoder["right"])/t
 
-        self.prev_encoder["left"] += encoder_left
-        self.prev_encoder["right"] += encoder_right
+            self.prev_encoder["left"] += encoder_left
+            self.prev_encoder["right"] += encoder_right
 
-        self.diffdrive(velocity_left, velocity_right, t, 245)
+            self.diffdrive(velocity_left, velocity_right, t, 245)
 
-        print(self.pose, end="\r")
-
-        time.sleep(0.5)
+            print(self.pose, end="\r", flush=True)
+            time.sleep(0.5)
 
     ## Destructor
     def __del__(self):
@@ -285,6 +284,7 @@ class FaulhaberComm:
                     "right" : 0
                     }
     _time = 0
+
     # Velocity scaling factors can be either 1 or -1.
     _VSCALE_L = -1
     _VSCALE_R = 1
